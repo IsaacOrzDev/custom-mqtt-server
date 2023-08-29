@@ -6,17 +6,17 @@ namespace Application
   public class CustomMQTTServer
   {
 
-    private async Task<string> OnNewMessage(InterceptingPublishEventArgs e)
+    private Task OnNewMessage(InterceptingPublishEventArgs e)
     {
       Console.WriteLine($"Received Payload: {System.Text.Encoding.Default.GetString(e.ApplicationMessage.PayloadSegment)}");
       Console.WriteLine($"ExpiryInterval: {e.ApplicationMessage.MessageExpiryInterval}");
       Console.WriteLine($"Client ID: {e.ClientId}");
       Console.WriteLine($"Topic: {e.ApplicationMessage.Topic}");
       Console.WriteLine($"Received Time: {DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")}");
-      return "";
+      return Task.CompletedTask;
     }
 
-    private async Task<Task> OnValidatingConnection(ValidatingConnectionEventArgs e)
+    private Task OnValidatingConnection(ValidatingConnectionEventArgs e)
     {
       if (!(e.Password == "password" && e.UserName == "username"))
       {
@@ -26,16 +26,18 @@ namespace Application
       return Task.CompletedTask;
     }
 
-    private async Task OnConnected(ClientConnectedEventArgs e)
+    private Task OnConnected(ClientConnectedEventArgs e)
     {
       Console.WriteLine($"Client ID: {e.ClientId}");
       Console.WriteLine($"Connected Time: {DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")}");
+      return Task.CompletedTask;
     }
 
-    private async Task OnDisconnected(ClientDisconnectedEventArgs e)
+    private Task OnDisconnected(ClientDisconnectedEventArgs e)
     {
       Console.WriteLine($"Client ID: {e.ClientId}");
       Console.WriteLine($"Disconnected Time: {DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")}");
+      return Task.CompletedTask;
     }
 
     public async Task StartMqttAsync()
