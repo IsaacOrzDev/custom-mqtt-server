@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Configuration;
 using MQTTnet;
 using MQTTnet.Server;
 
@@ -5,6 +6,12 @@ namespace Application
 {
   public class CustomMQTTServer
   {
+    private IConfiguration configuration;
+
+    public CustomMQTTServer(IConfiguration configuration)
+    {
+      this.configuration = configuration;
+    }
 
     private Task OnNewMessage(InterceptingPublishEventArgs e)
     {
@@ -18,7 +25,7 @@ namespace Application
 
     private Task OnValidatingConnection(ValidatingConnectionEventArgs e)
     {
-      if (!(e.Password == "password" && e.UserName == "username"))
+      if (!(e.Password == this.configuration.GetValue<string>("PASSWORD") && e.UserName == this.configuration.GetValue<string>("USERNAME")))
       {
         e.ReasonCode = MQTTnet.Protocol.MqttConnectReasonCode.NotAuthorized;
         return Task.FromException(new Exception("User is not authorized"));
