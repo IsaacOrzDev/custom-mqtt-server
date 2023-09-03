@@ -58,6 +58,12 @@ namespace Application
       mqttServer.ValidatingConnectionAsync += this.OnValidatingConnection;
       mqttServer.ClientConnectedAsync += this.OnConnected;
       mqttServer.ClientDisconnectedAsync += this.OnDisconnected;
+      mqttServer.ClientSubscribedTopicAsync += async (e) =>
+      {
+        Console.WriteLine($"Client ID: {e.ClientId}");
+        Console.WriteLine($"Subscribed Topic: {e.TopicFilter.Topic}");
+
+      };
       await mqttServer.StartAsync();
     }
   }
