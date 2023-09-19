@@ -19,16 +19,16 @@ var provider = new ServiceCollection()
     .BuildServiceProvider();
 
 ;
-using (var dbContext = provider.GetService<LogDbContext>())
-{
-    if (dbContext is not null)
-    {
-        if (!await dbContext.Database.EnsureCreatedAsync())
-        {
-            await dbContext.Database.MigrateAsync();
-        }
-    }
-}
+// using (var dbContext = provider.GetService<LogDbContext>())
+// {
+//     if (dbContext is not null)
+//     {
+//         if (!await dbContext.Database.EnsureCreatedAsync())
+//         {
+//             await dbContext.Database.MigrateAsync();
+//         }
+//     }
+// }
 
 var server = provider.GetService<MQTTServer>();
 if (server is null)
