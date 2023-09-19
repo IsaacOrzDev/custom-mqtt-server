@@ -4,28 +4,56 @@ using MQTTnet.Server;
 
 namespace Application
 {
-  public class CustomMQTTServer
+  public class MQTTServer
   {
-    private IConfiguration configuration;
+    private readonly IConfiguration configuration;
+    private readonly LogDbContext dbContext;
 
-    public CustomMQTTServer(IConfiguration configuration)
+    private readonly bool isDatabaseConnected = false;
+
+    public MQTTServer(IConfiguration configuration, LogDbContext dbContext)
     {
       this.configuration = configuration;
+      this.dbContext = dbContext;
+      this.isDatabaseConnected = this.dbContext.Database.CanConnect();
     }
 
-    private Task OnNewMessage(InterceptingPublishEventArgs e)
+    private async Task OnNewMessage(InterceptingPublishEventArgs e)
     {
-      Console.WriteLine($"Received Payload: {System.Text.Encoding.Default.GetString(e.ApplicationMessage.PayloadSegment)}");
-      Console.WriteLine($"ExpiryInterval: {e.ApplicationMessage.MessageExpiryInterval}");
-      Console.WriteLine($"Client ID: {e.ClientId}");
-      Console.WriteLine($"Topic: {e.ApplicationMessage.Topic}");
-      Console.WriteLine($"Received Time: {DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")}");
-      return Task.CompletedTask;
+      var payload = System.Text.Encoding.Default.GetString(e.ApplicationMessage.PayloadSegment);
+
+      if (isDatabaseConnected)
+      {
+        try
+        {
+          dbContext.Add(new MessageModel
+          {
+            Payload = payload,
+            ClientId = e.ClientId,
+            Topic = e.ApplicationMessage.Topic,
+            ExpiryInterval = e.ApplicationMessage.MessageExpiryInterval,
+            ReceivedAt = DateTime.Now.ToUniversalTime()
+          });
+          await dbContext.SaveChangesAsync();
+        }
+        catch (Exception ex)
+        {
+          Console.WriteLine($"An error occurred: {ex}");
+        }
+      }
+      else
+      {
+        Console.WriteLine($"Received Payload: {payload}");
+        Console.WriteLine($"ExpiryInterval: {e.ApplicationMessage.MessageExpiryInterval}");
+        Console.WriteLine($"Client ID: {e.ClientId}");
+        Console.WriteLine($"Topic: {e.ApplicationMessage.Topic}");
+        Console.WriteLine($"Received Time: {DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")}");
+      }
     }
 
     private Task OnValidatingConnection(ValidatingConnectionEventArgs e)
     {
-      if (!(e.Password == this.configuration.GetValue<string>("PASSWORD") && e.UserName == this.configuration.GetValue<string>("USERNAME")))
+      if (!(e.Password == configuration.GetValue<string>("PASSWORD") && e.UserName == configuration.GetValue<string>("USERNAME")))
       {
         e.ReasonCode = MQTTnet.Protocol.MqttConnectReasonCode.NotAuthorized;
         return Task.FromException(new Exception("User is not authorized"));
@@ -47,6 +75,34 @@ namespace Application
       return Task.CompletedTask;
     }
 
+    public async Task OnTopicSubscribed(ClientSubscribedTopicEventArgs e)
+    {
+      if (isDatabaseConnected)
+      {
+        try
+        {
+          dbContext.Subscriptions.Add(
+            new SubscriptionModel
+            {
+              ClientId = e.ClientId,
+              Topic = e.TopicFilter.Topic,
+              SubscribedAt = DateTime.Now.ToUniversalTime()
+            }
+          );
+          await dbContext.SaveChangesAsync();
+        }
+        catch (Exception ex)
+        {
+          Console.WriteLine($"An error occurred: {ex}");
+        }
+      }
+      else
+      {
+        Console.WriteLine($"Client ID: {e.ClientId}");
+        Console.WriteLine($"Subscribed Topic: {e.TopicFilter.Topic}");
+      }
+    }
+
     public async Task StartMqttAsync()
     {
       var optionsBuilder = new MqttServerOptionsBuilder()
@@ -54,16 +110,11 @@ namespace Application
         .WithDefaultEndpoint();
       var options = optionsBuilder.Build();
       var mqttServer = new MqttFactory().CreateMqttServer(options);
-      mqttServer.InterceptingPublishAsync += this.OnNewMessage;
-      mqttServer.ValidatingConnectionAsync += this.OnValidatingConnection;
-      mqttServer.ClientConnectedAsync += this.OnConnected;
-      mqttServer.ClientDisconnectedAsync += this.OnDisconnected;
-      mqttServer.ClientSubscribedTopicAsync += async (e) =>
-      {
-        Console.WriteLine($"Client ID: {e.ClientId}");
-        Console.WriteLine($"Subscribed Topic: {e.TopicFilter.Topic}");
-
-      };
+      mqttServer.InterceptingPublishAsync += OnNewMessage;
+      mqttServer.ValidatingConnectionAsync += OnValidatingConnection;
+      mqttServer.ClientConnectedAsync += OnConnected;
+      mqttServer.ClientDisconnectedAsync += OnDisconnected;
+      mqttServer.ClientSubscribedTopicAsync += OnTopicSubscribed;
       await mqttServer.StartAsync();
     }
   }
